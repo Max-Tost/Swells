@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swells — storm to surf</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<style>
+  :root{
+    --bg:#0e1720; --panel:#16222e; --line:#24344a; --ink:#e8eef4;
+    --muted:#8fa3b8; --accent:#e07a5f; --sea:#5aa9e6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{padding:18px 24px 8px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.2px}
+  h1 small{color:var(--muted);font-weight:400;font-size:13px;margin-left:10px}
+  main{display:grid;grid-template-columns:290px 1fr;gap:0;min-height:calc(100vh - 56px)}
+  #controls{padding:18px 20px;border-right:1px solid var(--line);
+            background:var(--panel);overflow-y:auto}
+  #stage{padding:16px 20px 40px;overflow-y:auto}
+  .grp{margin-bottom:20px}
+  .grp h2{font-size:11px;text-transform:uppercase;letter-spacing:.9px;
+          color:var(--muted);margin:0 0 10px;font-weight:600}
+  label{display:block;margin-bottom:12px;font-size:12.5px}
+  label .row{display:flex;justify-content:space-between;margin-bottom:3px}
+  label .v{color:var(--sea);font-variant-numeric:tabular-nums;font-weight:600}
+  input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));
+         gap:10px;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+        padding:9px 11px}
+  .card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
+           color:var(--muted)}
+  .card .n{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;
+           margin-top:2px}
+  .card .u{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}
+  .plots{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .plot{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+        padding:10px 12px 8px}
+  .plot h3{margin:0 0 2px;font-size:12.5px;font-weight:600}
+  .plot p{margin:0 0 6px;font-size:11px;color:var(--muted)}
+  canvas{width:100%;display:block;border-radius:3px}
+  .wide{grid-column:1 / -1}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+      padding:12px 14px;font-size:11.5px;color:var(--muted);overflow-x:auto;
+      margin:14px 0 0}
+  #boot{position:fixed;inset:0;background:var(--bg);display:flex;
+        align-items:center;justify-content:center;flex-direction:column;gap:12px;
+        z-index:99}
+  #boot .bar{width:220px;height:3px;background:var(--line);border-radius:2px;
+             overflow:hidden}
+  #boot .bar i{display:block;height:100%;width:30%;background:var(--accent);
+               animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
+  #boot p{color:var(--muted);font-size:12.5px;margin:0;text-align:center;max-width:320px}
+  .busy{opacity:.45;transition:opacity .12s}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div class="bar"><i></i></div>
+  <p id="bootmsg">Starting Python in the browser…</p>
+  <p style="font-size:11px">This runs the real <code>swells</code> package via
+     Pyodide — the same code the lessons derive, not a re-implementation.</p>
+</div>
+
+<header>
+  <h1>Swells <small>a storm becomes a set of waves</small></h1>
+</header>
+
+<main>
+<div id="controls">
+  <div class="grp">
+    <h2>The storm</h2>
+    <label><span class="row"><span>Wind speed U₁₀</span><span class="v" id="v_u10">25</span></span>
+      <input type="range" id="u10" min="8" max="40" step="1" value="25"></label>
+    <label><span class="row"><span>Fetch</span><span class="v" id="v_fetch">600 km</span></span>
+      <input type="range" id="fetch" min="50" max="2500" step="25" value="600"></label>
+    <label><span class="row"><span>Duration</span><span class="v" id="v_dur">36 h</span></span>
+      <input type="range" id="dur" min="3" max="96" step="1" value="36"></label>
+    <p style="font-size:11px;color:var(--muted);margin:-4px 0 0">
+      The fetch is also taken as the storm's width, so the patch radiating at
+      you is one fetch across.</p>
+  </div>
+
+  <div class="grp">
+    <h2>The ocean</h2>
+    <label><span class="row"><span>Distance to shore</span><span class="v" id="v_dist">4000 km</span></span>
+      <input type="range" id="dist" min="200" max="16000" step="100" value="4000"></label>
+  </div>
+
+  <div class="grp">
+    <h2>The coast</h2>
+    <label><span class="row"><span>Beach slope</span><span class="v" id="v_slope">1:50</span></span>
+      <input type="range" id="slope" min="5" max="200" step="1" value="50"></label>
+    <label><span class="row"><span>Approach angle</span><span class="v" id="v_ang">30°</span></span>
+      <input type="range" id="ang" min="0" max="70" step="1" value="30"></label>
+  </div>
+</div>
+
+<div id="stage">
+  <div class="cards" id="cards"></div>
+
+  <div class="plots">
+    <div class="plot"><h3>Spectrum</h3>
+      <p>Grey: in the storm. Blue: what reaches the buoy at the peak.</p>
+      <canvas id="c_spec" height="300"></canvas></div>
+
+    <div class="plot"><h3>Arrival spectrogram</h3>
+      <p>The ridge. Its slope is <em>g</em>/4π<em>D</em> and nothing else.</p>
+      <canvas id="c_sgram" height="300"></canvas></div>
+
+    <div class="plot wide"><h3>The sea surface at the buoy</h3>
+      <p>25 minutes. Red is the envelope; the dotted line is H<sub>m0</sub>.
+         Runs of waves above it are the sets.</p>
+      <canvas id="c_eta" height="260"></canvas></div>
+
+    <div class="plot"><h3>Event timeline</h3>
+      <p>Height and peak period over the whole arrival.</p>
+      <canvas id="c_time" height="280"></canvas></div>
+
+    <div class="plot"><h3>Into the surf zone</h3>
+      <p>Wave height over the beach profile, to the break.</p>
+      <canvas id="c_surf" height="280"></canvas></div>
+  </div>
+
+  <pre id="report">—</pre>
+</div>
+</main>
+
+<script>
+const MODULES = ["constants","util","dispersion","fetch","spectra","propagate",
+                 "synth","groups","nonlinear","nearshore","report","simulate",
+                 "__init__"];
+let pyodide = null, pending = false, queued = false;
+
+const $ = id => document.getElementById(id);
+const CTRL = ["u10","fetch","dur","dist","slope","ang"];
+
+function params(){
+  return {
+    U10:      +$("u10").value,
+    fetch_km: +$("fetch").value,
+    duration_h: +$("dur").value,
+    distance_km: +$("dist").value,
+    slope:    1 / (+$("slope").value),
+    approach_deg: +$("ang").value,
+  };
+}
+
+function labels(){
+  $("v_u10").textContent   = $("u10").value + " m/s";
+  $("v_fetch").textContent = $("fetch").value + " km";
+  $("v_dur").textContent   = $("dur").value + " h";
+  $("v_dist").textContent  = (+$("dist").value).toLocaleString() + " km";
+  $("v_slope").textContent = "1:" + $("slope").value;
+  $("v_ang").textContent   = $("ang").value + "°";
+}
+
+// ---------- tiny canvas plotting ----------
+const CSS = getComputedStyle(document.documentElement);
+const COL = k => CSS.getPropertyValue("--"+k).trim();
+
+function setup(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = +cv.getAttribute("height");
+  cv.width = w*dpr; cv.height = h*dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+  return {g, w, h, m:{l:46,r:10,t:8,b:26}};
+}
+function scales(P, xs, ys, x0, x1, y0, y1){
+  const {w,h,m} = P;
+  const xmin = x0 ?? Math.min(...xs), xmax = x1 ?? Math.max(...xs);
+  const ymin = y0 ?? Math.min(...ys), ymax = y1 ?? Math.max(...ys);
+  const sx = v => m.l + (v-xmin)/((xmax-xmin)||1)*(w-m.l-m.r);
+  const sy = v => h-m.b - (v-ymin)/((ymax-ymin)||1)*(h-m.t-m.b);
+  return {sx, sy, xmin, xmax, ymin, ymax};
+}
+function axes(P, S, xlab, ylab){
+  const {g,w,h,m} = P;
+  g.strokeStyle = COL("line"); g.lineWidth = 1;
+  g.beginPath(); g.moveTo(m.l, m.t); g.lineTo(m.l, h-m.b); g.lineTo(w-m.r, h-m.b); g.stroke();
+  g.fillStyle = COL("muted"); g.font = "10px ui-sans-serif";
+  for (let i=0;i<=4;i++){
+    const xv = S.xmin + i*(S.xmax-S.xmin)/4;
+    g.textAlign="center"; g.fillText(fmt(xv), S.sx(xv), h-m.b+13);
+    const yv = S.ymin + i*(S.ymax-S.ymin)/4;
+    g.textAlign="right"; g.fillText(fmt(yv), m.l-5, S.sy(yv)+3);
+    g.strokeStyle="rgba(255,255,255,.045)";
+    g.beginPath(); g.moveTo(m.l,S.sy(yv)); g.lineTo(w-m.r,S.sy(yv)); g.stroke();
+  }
+  g.textAlign="center"; g.fillStyle=COL("muted");
+  g.fillText(xlab, m.l+(w-m.l-m.r)/2, h-2);
+  g.save(); g.translate(11, m.t+(h-m.t-m.b)/2); g.rotate(-Math.PI/2);
+  g.fillText(ylab, 0, 0); g.restore();
+}
+function fmt(v){
+  const a = Math.abs(v);
+  if (a===0) return "0";
+  if (a<0.01) return v.toExponential(1);
+  if (a<1) return v.toFixed(a<0.1?3:2);
+  if (a<100) return v.toFixed(a<10?1:0);
+  return Math.round(v).toLocaleString();
+}
+function line(P,S,xs,ys,color,width){
+  const g=P.g; g.strokeStyle=color; g.lineWidth=width||1.4; g.beginPath();
+  for (let i=0;i<xs.length;i++){ const X=S.sx(xs[i]),Y=S.sy(ys[i]);
+    i?g.lineTo(X,Y):g.moveTo(X,Y); }
+  g.stroke();
+}
+
+function plotSpectrum(d){
+  const P = setup($("c_spec"));
+  const f = d.spectrum.f;
+  const top = Math.max(...d.spectrum.S_source);
+  const S = scales(P, f, [0,top], f[0], f[f.length-1], 0, top*1.05);
+  axes(P,S,"f (Hz)","S  (m²/Hz)");
+  line(P,S,f,d.spectrum.S_source,"rgba(143,163,184,.7)",1.4);
+  const pk = d.spectrum.S_peak, mx = Math.max(...pk);
+  const scaled = pk.map(v => v * (mx>0 ? top*0.92/mx : 0));
+  line(P,S,f,scaled,COL("sea"),1.8);
+  P.g.fillStyle=COL("muted"); P.g.font="10px ui-sans-serif"; P.g.textAlign="right";
+  P.g.fillText("arrival rescaled ×"+ (mx>0?(top*0.92/mx).toFixed(0):"—"),
+               P.w-P.m.r, P.m.t+11);
+}
+
+function plotSpectrogram(d){
+  const P = setup($("c_sgram"));
+  const {t,f,z,zmax} = d.spectrogram;
+  const S = scales(P,t,f,t[0],t[t.length-1],f[0],f[f.length-1]);
+  const g = P.g;
+  const x0=S.sx(t[0]), x1=S.sx(t[t.length-1]);
+  const y0=S.sy(f[f.length-1]), y1=S.sy(f[0]);
+  const W=Math.max(1,Math.round(x1-x0)), H=Math.max(1,Math.round(y1-y0));
+  const img = g.createImageData(W,H);
+  for (let py=0;py<H;py++){
+    const fi = Math.min(f.length-1, Math.round((1-py/(H-1))*(f.length-1)));
+    for (let px=0;px<W;px++){
+      const ti = Math.min(t.length-1, Math.round(px/(W-1)*(t.length-1)));
+      const v = zmax>0 ? Math.pow(z[ti][fi]/zmax, 0.42) : 0;
+      const o = 4*(py*W+px);
+      img.data[o]   = 255*Math.min(1,Math.max(0,1.35*v-0.05));
+      img.data[o+1] = 255*Math.min(1,Math.max(0,1.5*v*v));
+      img.data[o+2] = 255*Math.min(1,Math.max(0,0.55*v+0.30*v*v*v));
+      img.data[o+3] = 255;
+    }
+  }
+  g.putImageData(img, Math.round(x0), Math.round(y0));
+  axes(P,S,"days since the storm","f (Hz)");
+}
+
+function plotEta(d){
+  const P = setup($("c_eta"));
+  const {t,eta,env,Hm0} = d.record;
+  const top = Math.max(...env)*1.12 || 1;
+  const S = scales(P,t,eta,t[0],t[t.length-1],-top,top);
+  axes(P,S,"minutes","η (m)");
+  const g=P.g;
+  g.strokeStyle="rgba(143,163,184,.45)"; g.setLineDash([3,3]); g.lineWidth=1;
+  [Hm0/2,-Hm0/2].forEach(v=>{g.beginPath();g.moveTo(P.m.l,S.sy(v));
+    g.lineTo(P.w-P.m.r,S.sy(v));g.stroke();});
+  g.setLineDash([]);
+  line(P,S,t,eta,"rgba(90,169,230,.85)",0.8);
+  line(P,S,t,env,COL("accent"),1.6);
+  line(P,S,t,env.map(v=>-v),COL("accent"),1.6);
+}
+
+function plotTimeline(d){
+  const P = setup($("c_time"));
+  const {t,Hm0,Tp} = d.timeline;
+  const days = t.map(v=>v/24);
+  const S = scales(P,days,Hm0,days[0],days[days.length-1],0,Math.max(...Hm0)*1.1||1);
+  axes(P,S,"days since the storm","H_m0 (m)");
+  line(P,S,days,Hm0,COL("sea"),1.8);
+  const tmax = Math.max(...Tp.filter(v=>v>0&&v<40))||20;
+  const S2 = {sx:S.sx, sy:v=>S.sy(v/tmax*S.ymax)};
+  line(P,S2,days,Tp.map(v=>Math.min(v,tmax)),"rgba(224,122,95,.75)",1.3);
+  P.g.fillStyle=COL("accent"); P.g.font="10px ui-sans-serif"; P.g.textAlign="right";
+  P.g.fillText("period (falling) →", P.w-P.m.r, P.m.t+11);
+}
+
+function plotSurf(d){
+  const P = setup($("c_surf"));
+  const {x,h,H,break:br} = d.surf;
+  const S = scales(P,x,H,Math.max(...x),0,-Math.max(...h)/4,Math.max(...H)*1.25||1);
+  axes(P,S,"metres offshore","H (m)   /   seabed");
+  line(P,S,x,h.map(v=>-v/4),"rgba(143,163,184,.6)",1.2);
+  line(P,S,x,H,COL("sea"),1.8);
+  if (br){
+    const g=P.g;
+    g.strokeStyle=COL("accent"); g.setLineDash([4,3]); g.lineWidth=1.2;
+    g.beginPath(); g.moveTo(S.sx(br.x),P.m.t); g.lineTo(S.sx(br.x),P.h-P.m.b); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle=COL("accent"); g.font="600 11px ui-sans-serif"; g.textAlign="left";
+    g.fillText(br.kind, S.sx(br.x)+5, P.m.t+12);
+    g.font="10px ui-sans-serif";
+    g.fillText(br.H.toFixed(1)+" m in "+br.h.toFixed(1)+" m", S.sx(br.x)+5, P.m.t+25);
+  }
+}
+
+function cards(d){
+  const b = d.buoy;
+  const items = [
+    ["Storm seas", d.storm.Hs.toFixed(1), "m"],
+    ["Storm period", d.storm.Tp.toFixed(1), "s"],
+    ["Peak arrives", b.peak_day.toFixed(1), "days"],
+    ["At the buoy", b.Hm0.toFixed(2), "m"],
+    ["Period", b.Tp.toFixed(1), "s"],
+    ["Waves per set", b.waves_per_set.toFixed(1), ""],
+    ["Set interval", b.set_interval_min.toFixed(1), "min"],
+    ["Biggest / hour", b.H_max_hour.toFixed(2), "m"],
+  ];
+  if (d.surf.break) items.push(["Breaker", d.surf.break.H.toFixed(1), "m " + d.surf.break.kind]);
+  $("cards").innerHTML = items.map(([k,n,u]) =>
+    `<div class="card"><div class="k">${k}</div>
+     <div class="n">${n}<span class="u">${u}</span></div></div>`).join("");
+}
+
+function draw(d){
+  cards(d); plotSpectrum(d); plotSpectrogram(d); plotEta(d);
+  plotTimeline(d); plotSurf(d);
+  $("report").textContent = d.report;
+}
+
+// ---------- driving Pyodide ----------
+async function compute(){
+  if (!pyodide) return;
+  if (pending){ queued = true; return; }
+  pending = true;
+  $("stage").classList.add("busy");
+  try {
+    // Hand the parameters over as a JSON string. Relying on toPy's object
+    // conversion is version-dependent; json.loads is not.
+    pyodide.globals.set("_p_json", JSON.stringify(params()));
+    const js = await pyodide.runPythonAsync(
+      "import json; bridge.simulate(**json.loads(_p_json))");
+    window._last = JSON.parse(js);
+    draw(window._last);
+  } catch (e) {
+    $("report").textContent = "" + e;
+    console.error(e);
+  } finally {
+    pending = false;
+    $("stage").classList.remove("busy");
+    if (queued){ queued = false; compute(); }
+  }
+}
+
+let timer = null;
+function onInput(){
+  labels();
+  clearTimeout(timer);
+  timer = setTimeout(compute, 130);
+}
+
+async function boot(){
+  const msg = $("bootmsg");
+  msg.textContent = "Loading Python…";
+  pyodide = await loadPyodide();
+  msg.textContent = "Loading numpy and scipy… (a few seconds, once)";
+  await pyodide.loadPackage(["numpy","scipy"]);
+
+  msg.textContent = "Fetching the swells package…";
+  await pyodide.runPythonAsync("import os; os.makedirs('/swells', exist_ok=True)");
+  const base = new URL("..", window.location.href).href;
+  for (const m of MODULES){
+    const src = await (await fetch(base + "swells/" + m + ".py")).text();
+    pyodide.FS.writeFile("/swells/" + m + ".py", src);
+  }
+  const bridge = await (await fetch(base + "app/bridge.py")).text();
+  pyodide.FS.writeFile("/bridge.py", bridge);
+
+  await pyodide.runPythonAsync(
+    "import sys; sys.path.insert(0,'/'); import bridge");
+
+  msg.textContent = "Running the first simulation…";
+  CTRL.forEach(id => $(id).addEventListener("input", onInput));
+  window.addEventListener("resize", () => window._last && draw(window._last));
+  labels();
+  await compute();
+  $("boot").style.display = "none";
+}
+
+boot().catch(e => {
+  $("bootmsg").innerHTML = "Failed to start:<br><code>" + e +
+    "</code><br><br>This page must be served over HTTP, not opened as a file." +
+    "<br>Run <code>python app/serve.py</code> from the repository root.";
+});
+</script>
+</body>
+</html>
