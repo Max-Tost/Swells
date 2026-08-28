@@ -111,15 +111,80 @@ only up to such a thing anyway.)
 
 $$\frac{\partial\phi}{\partial z} = 0 \qquad\text{at } z=-h. \tag{1.2}$$
 
-**At the surface, kinematically.** A fluid particle on the surface stays on the
-surface. Write the surface as $F = z - \eta(x,y,t) = 0$ and demand
-$DF/Dt = 0$:
+**At the surface, kinematically.** This one deserves care, because it is where
+the moving boundary first bites.
+
+The physical statement is that the free surface is a *material* surface: it is
+made of water, and it is made of the same water from one moment to the next.
+A particle sitting on the surface stays on the surface. It never crosses to the
+inside, and it never leaves — if it did, either the sea would be leaking into
+the air or the surface would have torn, and neither is allowed in this model.
+(This is exactly the assumption that fails when a wave breaks and throws a jet
+of water off the crest into free flight, which is why lesson 10 needs a
+different kind of argument.)
+
+To turn that into an equation, define
+
+$$F(x,y,z,t) = z - \eta(x,y,t),$$
+
+so that $F=0$ *is* the surface, $F>0$ is air and $F<0$ is water. Now "a surface
+particle stays on the surface" reads: the value of $F$ carried by that particle
+never changes. Following the particle means the material derivative from the
+Euler section, so
+
+$$\frac{DF}{Dt} = \frac{\partial F}{\partial t}
++ (\mathbf u\cdot\nabla)F = 0.$$
+
+Work out the two pieces. Since $z$ carries no explicit time dependence, only
+$\eta$ contributes to the first:
+
+$$\frac{\partial F}{\partial t} = -\frac{\partial\eta}{\partial t}.$$
+
+And the gradient of $F$, taking the derivative of $z$ with respect to $z$ to be
+1, is
+
+$$\nabla F = \left(-\frac{\partial\eta}{\partial x},\;
+-\frac{\partial\eta}{\partial y},\; 1\right),$$
+
+so with $\mathbf u = (u,v,w)$,
+
+$$(\mathbf u\cdot\nabla)F
+= -u\frac{\partial\eta}{\partial x} - v\frac{\partial\eta}{\partial y} + w.$$
+
+Add them, set the sum to zero, and flip the signs:
+
+$$\frac{\partial\eta}{\partial t}
++ u\frac{\partial\eta}{\partial x}
++ v\frac{\partial\eta}{\partial y}
+= w
+\qquad\text{at } z=\eta.$$
+
+Finally substitute $\mathbf u = \nabla\phi$:
 
 $$\frac{\partial\eta}{\partial t}
 + \frac{\partial\phi}{\partial x}\frac{\partial\eta}{\partial x}
 + \frac{\partial\phi}{\partial y}\frac{\partial\eta}{\partial y}
 = \frac{\partial\phi}{\partial z}
 \qquad\text{at } z=\eta. \tag{1.3}$$
+
+Nothing has been approximated yet — (1.3) is exact.
+
+Two ways to read it. Geometrically, $\nabla F$ points along the surface normal,
+so the condition says the fluid's normal velocity equals the surface's own
+normal velocity: the water keeps up with the interface exactly, neither
+outrunning it nor falling behind.
+
+More concretely, in one dimension it is $\partial_t\eta = w - u\,\partial_x\eta$.
+The surface at a fixed $x$ rises for two reasons — water moving up, and water
+moving *sideways along a slope*. Stand at one spot as a wave approaches: some
+of the rise under your feet is water lifting, and some is simply the upslope
+face of the wave being carried past you. It is the material derivative again,
+in the same two pieces.
+
+And notice the nuisance: (1.3) is nonlinear, because $u$ multiplies
+$\partial_x\eta$ and both are unknowns, and it must be imposed at $z=\eta$,
+which we also do not know. That is the difficulty we buy our way out of in the
+next section.
 
 **At the surface, dynamically.** The pressure just under the surface equals the
 atmospheric pressure just above it. (We are ignoring surface tension, which is
@@ -147,20 +212,84 @@ $\epsilon \approx 0.1$, and at $\epsilon\approx 0.44$ the wave breaks and there
 is no point in theory anyway. So $\epsilon$ is a genuinely small parameter over
 the entire range we care about.
 
-Two consequences. First, quadratic terms go: $|\nabla\phi|^2$ is
-$\mathcal O(\epsilon^2)$ relative to $\partial\phi/\partial t$, and the
-$\nabla\phi\cdot\nabla\eta$ term in (1.3) likewise. Second — and this is the
-step that actually rescues us — we can evaluate the surface conditions at
-$z=0$ instead of $z=\eta$, because Taylor expanding
+### Getting the scales straight
+
+Before throwing anything away we should be able to say, term by term, *how*
+small it is. That needs an estimate of the size of each quantity, and there are
+only four scales in the problem.
+
+The surface height is $\eta\sim a$, by definition of the amplitude, and the
+time scale is $1/\omega$.
+
+The horizontal length scale is $1/k$, also by definition. The vertical scale is
+$1/k$ **as well**, and this is the one worth pausing on, because it is not an
+assumption — Laplace's equation forces it. Put $\phi \sim Z(z)e^{ikx}$ into
+$\nabla^2\phi = 0$ and you get $Z'' = k^2Z$, whose solutions are $e^{\pm kz}$.
+So the only vertical scale available is $1/k$: a wave 156 m long stirs the
+water to a depth of order 25 m and no deeper, and a ripple 2 cm long stirs it
+to a few millimetres. **Every $\partial/\partial z$ therefore brings down a
+factor of $k$**, and so does every $\partial/\partial x$. Hold on to that; it
+is the whole engine of the estimate.
+
+The velocity follows. A water particle traces an orbit of radius $\sim a$ once
+per period, so
+
+$$|\mathbf u| \sim a\omega .$$
+
+And since $\mathbf u = \nabla\phi$ and the gradient contributes a factor $k$,
+
+$$\phi \sim \frac{a\omega}{k}.$$
+
+That is everything we need. Now the bookkeeping is three one-line checks, and
+they all return the same answer.
+
+**The quadratic term in Bernoulli.** Compare the two terms in (1.4):
+
+$$\frac{\tfrac12|\nabla\phi|^2}{\partial\phi/\partial t}
+\sim \frac{(a\omega)^2}{\omega\cdot a\omega/k}
+= ak = \epsilon .$$
+
+**The convective term in the kinematic condition.** Compare the two terms
+in (1.3):
+
+$$\frac{u\,\partial\eta/\partial x}{\partial\eta/\partial t}
+\sim \frac{(a\omega)(ak)}{a\omega} = ak = \epsilon .$$
+
+Which is the same statement as before in different clothes: the material
+derivative's second piece is $\epsilon$ times its first. Following the parcel
+barely differs from watching the point, and now we know by how much.
+
+**The Taylor correction.** Here is the one you asked about. Expanding about the
+mean surface,
 
 $$\left.\frac{\partial\phi}{\partial z}\right|_{z=\eta}
 = \left.\frac{\partial\phi}{\partial z}\right|_{z=0}
 + \eta\left.\frac{\partial^2\phi}{\partial z^2}\right|_{z=0} + \cdots$$
 
-and the correction is $\mathcal O(\epsilon)$ smaller than the leading term. The
-moving boundary becomes a fixed one. That is the whole content of linear wave
-theory, and it is why the theory works so well: not because the waves are
-small, but because we only needed the *boundary* to be nearly flat.
+the correction differs from the leading term by one factor of $\eta$ and one
+extra $\partial/\partial z$. The first supplies an $a$, the second supplies a
+$k$, so
+
+$$\frac{\eta\,\partial^2\phi/\partial z^2}{\partial\phi/\partial z}
+\sim ak = \epsilon .$$
+
+That is the general rule, and it is worth stating on its own: **each further
+term in the expansion costs one factor of $\epsilon$**, because each one trades
+a power of $\eta$ (worth $a$) against a $z$-derivative (worth $k$). The series
+is an expansion in $ka$, and evaluating at $z=0$ instead of $z=\eta$ is simply
+truncating it at first order.
+
+### Doing it
+
+With the scales established, the two simplifications are now justified rather
+than asserted. Drop everything of relative order $\epsilon$: the quadratic
+terms go, and the surface conditions may be imposed at $z=0$ instead of
+$z=\eta$.
+
+The moving boundary has become a fixed one. That is the whole content of linear
+wave theory, and it is why the theory works so well: not because the waves are
+small in any absolute sense, but because we only ever needed the *boundary* to
+be nearly flat.
 
 What is left is embarrassingly simple:
 

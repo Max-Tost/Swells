@@ -105,18 +105,18 @@
   <div class="cards" id="cards"></div>
 
   <div class="plots">
-    <div class="plot"><h3>Spectrum</h3>
-      <p>Grey: in the storm. Blue: what reaches the buoy at the peak.</p>
-      <canvas id="c_spec" height="300"></canvas></div>
-
-    <div class="plot"><h3>Arrival spectrogram</h3>
-      <p>The ridge. Its slope is <em>g</em>/4π<em>D</em> and nothing else.</p>
-      <canvas id="c_sgram" height="300"></canvas></div>
-
     <div class="plot wide"><h3>The sea surface at the buoy</h3>
       <p>25 minutes. Red is the envelope; the dotted line is H<sub>m0</sub>.
          Runs of waves above it are the sets.</p>
       <canvas id="c_eta" height="260"></canvas></div>
+
+    <div class="plot"><h3>Spectrum</h3>
+      <p>Grey: in the storm. Blue: what reaches the buoy at the peak.</p>
+      <canvas id="c_spec" height="340"></canvas></div>
+
+    <div class="plot"><h3>Arrival spectrogram</h3>
+      <p>The ridge. Its slope is <em>g</em>/4π<em>D</em> and nothing else.</p>
+      <canvas id="c_sgram" height="340"></canvas></div>
 
     <div class="plot"><h3>Event timeline</h3>
       <p>Height and peak period over the whole arrival.</p>
@@ -166,8 +166,18 @@ const COL = k => CSS.getPropertyValue("--"+k).trim();
 
 function setup(cv){
   const dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, h = +cv.getAttribute("height");
-  cv.width = w*dpr; cv.height = h*dpr;
+  // canvas.height is a *reflecting* attribute: assigning to it rewrites the
+  // HTML height="". So reading it back after the first draw returns the
+  // device-pixel value, and on a dpr > 1 screen the canvas grows by another
+  // factor of dpr on every redraw, stretching everything. Cache the intended
+  // CSS height once and never read it back.
+  if (!cv.dataset.cssHeight) cv.dataset.cssHeight = cv.getAttribute("height");
+  const h = +cv.dataset.cssHeight;
+  const w = cv.clientWidth;
+  // Pin the CSS box too, so layout never depends on the backing-store size.
+  cv.style.height = h + "px";
+  cv.width = Math.round(w*dpr);
+  cv.height = Math.round(h*dpr);
   const g = cv.getContext("2d");
   g.setTransform(dpr,0,0,dpr,0,0);
   g.clearRect(0,0,w,h);
@@ -229,28 +239,50 @@ function plotSpectrum(d){
                P.w-P.m.r, P.m.t+11);
 }
 
+const clamp01 = v => Math.min(1, Math.max(0, v));
+
 function plotSpectrogram(d){
   const P = setup($("c_sgram"));
   const {t,f,z,zmax} = d.spectrogram;
   const S = scales(P,t,f,t[0],t[t.length-1],f[0],f[f.length-1]);
   const g = P.g;
-  const x0=S.sx(t[0]), x1=S.sx(t[t.length-1]);
-  const y0=S.sy(f[f.length-1]), y1=S.sy(f[0]);
-  const W=Math.max(1,Math.round(x1-x0)), H=Math.max(1,Math.round(y1-y0));
-  const img = g.createImageData(W,H);
-  for (let py=0;py<H;py++){
-    const fi = Math.min(f.length-1, Math.round((1-py/(H-1))*(f.length-1)));
-    for (let px=0;px<W;px++){
-      const ti = Math.min(t.length-1, Math.round(px/(W-1)*(t.length-1)));
-      const v = zmax>0 ? Math.pow(z[ti][fi]/zmax, 0.42) : 0;
-      const o = 4*(py*W+px);
-      img.data[o]   = 255*Math.min(1,Math.max(0,1.35*v-0.05));
-      img.data[o+1] = 255*Math.min(1,Math.max(0,1.5*v*v));
-      img.data[o+2] = 255*Math.min(1,Math.max(0,0.55*v+0.30*v*v*v));
+  const nt = t.length, nf = f.length;
+
+  // Render the grid at its own resolution into an offscreen canvas, then let
+  // drawImage place and scale it.
+  //
+  // Doing this the obvious way -- building an ImageData the size of the plot
+  // box and calling putImageData -- is wrong, because putImageData is the one
+  // draw call that IGNORES the canvas transform. It writes raw device pixels.
+  // So on any display with devicePixelRatio != 1 the heatmap lands in the
+  // wrong place at the wrong size while the axes, drawn through the transform,
+  // sit somewhere else entirely. drawImage respects the transform.
+  const off = document.createElement("canvas");
+  off.width = nt; off.height = nf;
+  const og = off.getContext("2d");
+  const img = og.createImageData(nt, nf);
+  for (let iy=0; iy<nf; iy++){
+    const fi = nf-1-iy;                 // image row 0 is the highest frequency
+    for (let ix=0; ix<nt; ix++){
+      const v = zmax>0 ? Math.pow(z[ix][fi]/zmax, 0.42) : 0;
+      const o = 4*(iy*nt+ix);
+      img.data[o]   = 255*clamp01(1.35*v-0.05);
+      img.data[o+1] = 255*clamp01(1.5*v*v);
+      img.data[o+2] = 255*clamp01(0.55*v+0.30*v*v*v);
       img.data[o+3] = 255;
     }
   }
-  g.putImageData(img, Math.round(x0), Math.round(y0));
+  og.putImageData(img, 0, 0);
+
+  const x0=S.sx(t[0]), x1=S.sx(t[t.length-1]);
+  const y0=S.sy(f[f.length-1]), y1=S.sy(f[0]);
+  g.save();
+  g.fillStyle = "#000"; g.fillRect(x0, y0, x1-x0, y1-y0);
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = "high";
+  g.drawImage(off, x0, y0, x1-x0, y1-y0);
+  g.restore();
+
   axes(P,S,"days since the storm","f (Hz)");
 }
 
@@ -281,7 +313,7 @@ function plotTimeline(d){
   const S2 = {sx:S.sx, sy:v=>S.sy(v/tmax*S.ymax)};
   line(P,S2,days,Tp.map(v=>Math.min(v,tmax)),"rgba(224,122,95,.75)",1.3);
   P.g.fillStyle=COL("accent"); P.g.font="10px ui-sans-serif"; P.g.textAlign="right";
-  P.g.fillText("period (falling) →", P.w-P.m.r, P.m.t+11);
+  P.g.fillText("period (falling)", P.w-P.m.r, P.m.t+11);
 }
 
 function plotSurf(d){
