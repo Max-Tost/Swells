@@ -91,7 +91,7 @@ Real storms are not points and do not radiate for an instant, so the arrival at
 a given time is not a single frequency but a narrow band. Two things smear it.
 
 **Duration.** If the storm blew for $T_{\rm storm}$, each frequency keeps
-arriving for that long, and by (5.2) a spread in time is a spread in frequency:
+arriving for that long, and by (5.3) a spread in time is a spread in frequency:
 
 $$\Delta f_{\rm dur} = \frac{g}{4\pi D}\,T_{\rm storm}.$$
 

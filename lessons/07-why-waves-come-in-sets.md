@@ -45,24 +45,29 @@ with $a_j = \sqrt{2S(f_j)\Delta f}$ so that each band contributes its share of
 the variance. This is what `swells.synth.surface_elevation` builds, by inverse
 FFT.
 
-Now suppose the band is narrow, centred on $\bar\omega$. Factor the carrier out:
+To pull a carrier out of that sum, write it with phasors and add and subtract a
+reference frequency $\bar\omega$ inside each phase:
 
-$$\eta(t) = u_c(t)\cos\bar\omega t - u_s(t)\sin\bar\omega t
-= R(t)\cos\big[\bar\omega t + \theta(t)\big]$$
+$$\eta = \mathrm{Re}\sum_j a_je^{i(\omega_jt+\varepsilon_j)}
+= \mathrm{Re}\Big[e^{i\bar\omega t}\sum_j a_je^{i\psi_j}\Big],
+\qquad \psi_j = (\omega_j-\bar\omega)t+\varepsilon_j.$$
 
-with
+The factor $e^{i\bar\omega t}$ is common to every component, so it comes
+outside and the thousands of terms collapse into one complex number:
 
-$$u_c = \sum_j a_j\cos\big[(\omega_j-\bar\omega)t+\varepsilon_j\big],
+$$\eta = \mathrm{Re}\big[A(t)\,e^{i\bar\omega t}\big],
 \qquad
-u_s = \sum_j a_j\sin\big[(\omega_j-\bar\omega)t+\varepsilon_j\big].$$
+A = \sum_j a_je^{i\psi_j} \equiv u_c + iu_s \equiv R\,e^{i\theta}. \tag{7.a}$$
 
-Because the band is narrow, $\omega_j-\bar\omega$ is small, so $u_c$ and $u_s$
-vary slowly compared with the carrier. They are the envelope
-$R=\sqrt{u_c^2+u_s^2}$ and the phase.
+A rotating vector times a slowly changing complex number.
 
-(In practice you extract $R$ from a record with a Hilbert transform: the
-analytic signal $\eta + i\mathcal H[\eta]$ has modulus $R$. That is
-`swells.groups.envelope`.)
+The physics enters only now. If the band is narrow every $\psi_j$ creeps, so
+$A$ barely moves over one carrier cycle: a fixed oscillation whose amplitude is
+modulated, which is what a set *is*.
+
+Any $\bar\omega$ works, but the slowest $A$ comes from the spectral centroid
+$\bar f = m_1/m_0$. On a measured record you get $R$ from a Hilbert transform,
+which builds $A$ for you — that is `swells.groups.envelope`.
 
 ## The envelope is Rayleigh
 
@@ -138,12 +143,11 @@ narrow spectrum has a wide transform, so $\kappa\to1$: the envelope barely
 changes from one wave to the next, and big waves come in company. A broad
 spectrum gives $\kappa\to0$ and no memory at all.
 
-Two remarks. Take the *modulus* of the complex integral — writing only the
-cosine part, as some references do, throws away the sine term and underestimates
-$\kappa$ for asymmetric spectra. And note that $\kappa$ is weighted by $S$, not
-$f^2S$: unlike the bandwidth $\nu$ of lesson 4, it does not care about the
-high-frequency tail. Over cutoffs from $3f_p$ to $25f_p$, $\nu$ moves 30% and
-$\kappa$ moves 0.6%. That is why the grouping calculation uses $\kappa$.
+Take the *modulus* of the complex integral: dropping the sine term, as some
+references do, underestimates $\kappa$ for asymmetric spectra. Note also that
+$\kappa$ weights by $S$ rather than $f^2S$, so unlike the bandwidth $\nu$ of
+lesson 4 it is insensitive to where you truncate the tail. That is why the
+grouping calculation uses it.
 
 ## How many waves in a set
 
@@ -244,23 +248,10 @@ two separate peaks.
 
 ## Checking it
 
-The claim of this lesson is falsifiable, so we falsify it. Two independent
-routes to waves-per-set:
-
-1. **Theory.** From the spectrum: compute $\kappa$ by (7.4), $p_{22}$ by (7.6),
-   $\bar j$ by (7.7). No time series involved.
-2. **Counting.** Synthesise a forty-hour record with random phases, split it
-   into waves at zero up-crossings, mark the ones over $H_{m0}$, count the runs.
-   No distribution theory involved.
-
-`tests/test_groups.py::test_predicted_and_counted_run_lengths_agree` runs both
-at three different bandwidths and demands they agree within 15%. They do.
-
-This test is not decoration. The research draft this project was built from had
-a `p22` of the form `kappa**1.5 + (1-kappa**1.5)*exp(-2)` — a plausible-looking
-interpolation with no derivation behind it. It gives the right answer at the
-endpoints and the wrong answer everywhere in between, and nothing but a test
-like this would have caught it.
+The claim is falsifiable, so we falsify it. Predicting $\bar j$ from the
+spectrum uses no time series; counting runs in a synthesised record uses no
+distribution theory. `tests/test_groups.py::test_predicted_and_counted_run_lengths_agree`
+runs both at three bandwidths and demands they agree within 15%. They do.
 
 ![sets](../figures/fig07_sets.png)
 
